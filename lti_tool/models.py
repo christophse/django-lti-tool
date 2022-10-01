@@ -58,14 +58,11 @@ class Key(models.Model):
 
 class Platform(Updatable):
     issuer = models.CharField(max_length=255)
-    deployment_id = models.CharField(max_length=255)
-    client_id = models.CharField(max_length=255)
-    auth_req_url = models.URLField(max_length=255,
-                                   verbose_name='Authentification request URL')
-    pub_key_url = models.URLField(max_length=255,
-                                  verbose_name='Public keyset URL')
-    access_token_url = models.URLField(max_length=255,
-                                       verbose_name='Access token URL')
+    deployment_id = models.CharField('Deployment ID', max_length=255)
+    client_id = models.CharField('Client ID', max_length=255)
+    auth_req_url = models.URLField('Auth. request URL', max_length=255)
+    pub_key_url = models.URLField('Public keyset URL', max_length=255)
+    access_token_url = models.URLField('Access token URL', max_length=255)
     platform_claim = models.JSONField(editable=False, default=dict)
     key = models.ForeignKey(Key, on_delete=models.CASCADE)
 
@@ -82,7 +79,7 @@ class Platform(Updatable):
         super().__init__(*args, **kwargs)
 
     def __str__(self):
-        return f'{self.issuer} (deployment ID: {self.deployment_id})'
+        return f'{self.issuer} (Deployment ID: {self.deployment_id})'
 
     @property
     def keyset(self):
