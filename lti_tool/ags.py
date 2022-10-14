@@ -275,6 +275,9 @@ class Score:
             raise ValueError(f'Argument grading_progress has to be one of '
                              f'{str(valid_grading_progress)}')
 
+    def __repr__(self):
+        return str(self.to_dict())
+
     def to_dict(self):
         score = {
             'userId': self.user.identifier,
