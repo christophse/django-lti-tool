@@ -174,17 +174,14 @@ class Resource(Updatable):
             )
         ]
 
-    def get_lineitem(self, lazy=True):
+    @property
+    def lineitem(self):
         """Returns the associated lineitem.
 
-        :param lazy: Will load auxillary lineitem information from platform
-            (HTTP request), if false.
+        :rtype: :class:`ags.LineItem`
         """
         data = {'id': self.lineitem_id}
         lineitem = LineItem(self.context.lineitems, data)
-
-        if not lazy:
-            lineitem.load()
 
         return lineitem
 

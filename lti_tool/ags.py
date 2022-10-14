@@ -174,24 +174,35 @@ class LineItem:
         self._manager = manager
         self._loaded = loaded
         self._data = data
-        self._add_attrs(data)
+
+    def __repr__(self):
+        if not self._loaded:
+            self.get()
+        return str(self._data)
 
     def __setattr__(self, key, value):
         if not key.startswith('_'):
             self._data[key] = value
         super().__setattr__(key, value)
 
-    def _add_attrs(self, data):
-        for (key, value) in data.items():
-            setattr(self, key, value)
+    def __getattr__(self, key):
+        # Lazy load attributes if accessed
+        if key not in self._data:
+            if not self._loaded:
+                self.get()
+                return self.__getattr__(key)
 
-    def load(self):
+            raise AttributeError(key)
+
+        return self._data[key]
+
+    def get(self):
         """Lazy load this lineitem."""
         self._loaded = True
 
         lineitem = self._manager.get(self.id)
         if lineitem:
-            self._add_attrs(lineitem._data)
+            self._data = lineitem._data
 
     def delete(self):
         """Deletes this lineitem."""
@@ -204,7 +215,7 @@ class LineItem:
         """
         lineitem = self._manager.update(self.id, self._data)
         if lineitem:
-            self._add_attrs(lineitem._data)
+            self._data = lineitem._data
 
     def get_results(self):
         """Gets results of this lineitem.
