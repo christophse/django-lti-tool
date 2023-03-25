@@ -10,6 +10,10 @@ class LTIContextError(LTIError):
     pass
 
 
+class LTIImproperlyConfigured(LTIError):
+    pass
+
+
 class LTIRequestError(LTIError):
     pass
 

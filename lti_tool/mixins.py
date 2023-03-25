@@ -3,31 +3,53 @@ from jwcrypto.common import json_decode, JWException
 
 from django.contrib.auth import authenticate, login
 from django.core.exceptions import PermissionDenied
+from django.views.generic.detail import SingleObjectMixin
 
-from lti_tool.exceptions import LTIContextError, LTIValidationError
-from lti_tool.models import Context, Platform, Resource
+from lti_tool.exceptions import (LTIContextError, LTIImproperlyConfigured,
+                                 LTIValidationError)
+from lti_tool.models import Context, LTIResource, Platform, Resource
+
+
+def validate(request):
+    platform = Platform.objects.get(pk=request.session['lti-platform'])
+
+    if request.method.lower() != 'post' or 'id_token' not in request.POST:
+        return None
+
+    token = request.POST['id_token']
+    nonce = request.session['lti-nonce']
+
+    check_claims = {
+        'aud': platform.client_id,
+        'iss': platform.issuer
+    }
+
+    try:
+        token_json = jwt.JWT(jwt=token, key=platform.keyset,
+                             check_claims=check_claims)
+    except JWException as e:
+        raise LTIValidationError from e
+
+    claims = json_decode(token_json.claims)
+
+    if nonce != claims['nonce']:
+        raise LTIValidationError('Nonce is invalid.')
+
+    return claims, platform
 
 
 class LTIMessageMixin:
-    def validate(self, token, nonce, platform):
-        check_claims = {
-            'aud': platform.client_id,
-            'iss': platform.issuer
-        }
+    def dispatch(self, request, *args, **kwargs):
+        claims, platform = validate(request)
 
-        try:
-            token_json = jwt.JWT(jwt=token, key=platform.keyset,
-                                 check_claims=check_claims)
-        except JWException as e:
-            raise LTIValidationError from e
+        kwargs.update({
+            'claims': claims
+        })
 
-        claims = json_decode(token_json.claims)
+        return super().dispatch(request, *args, **kwargs)
 
-        if nonce != claims['nonce']:
-            raise LTIValidationError('Nonce is invalid.')
 
-        return claims
-
+class LTIResourceMixin(SingleObjectMixin):
     def get_context(self, claims, platform):
         fields = Context.get_fields(claims)
 
@@ -62,17 +84,24 @@ class LTIMessageMixin:
         if not created:
             resource.update(fields)
 
+        opaque = self.get_object()
+        if not isinstance(opaque, LTIResource):
+            cls = opaque.__class__.__name__
+            raise LTIImproperlyConfigured(
+                f'{cls} is not an instance of LTIResource.'
+                f'Define {cls} as {cls}(LTIResource).'
+            )
+
+        if opaque.lti_resource != resource:
+            opaque.lti_resource = resource
+            opaque.save()
+
         return resource
 
     def dispatch(self, request, *args, **kwargs):
-        platform = Platform.objects.get(pk=request.session['lti-platform'])
+        claims, platform = validate(request)
 
-        # Assume login
-        if request.method.lower() == 'post' and 'id_token' in request.POST:
-            token = request.POST['id_token']
-            nonce = request.session['lti-nonce']
-            claims = self.validate(token, nonce, platform)
-
+        if claims:
             # Update platform information
             platform_fields = platform.get_fields(claims)
             if platform_fields:
@@ -91,8 +120,6 @@ class LTIMessageMixin:
             if user is not None:
                 login(request, user)
                 request.session['lti-context'] = context.id
-
-        # No login
         else:
             claims = None
             resource = None

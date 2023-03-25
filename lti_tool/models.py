@@ -217,6 +217,11 @@ class Resource(Updatable):
         }
 
 
+class LTIResource(models.Model):
+    lti_resource = models.ForeignKey(Resource, on_delete=models.PROTECT,
+                                     blank=True, null=True)
+
+
 class LTIUser(Updatable):
     user = models.OneToOneField(User, on_delete=models.CASCADE,
                                 related_name='lti')
