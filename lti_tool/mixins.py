@@ -7,14 +7,14 @@ from django.views.generic.detail import SingleObjectMixin
 
 from lti_tool.exceptions import (LTIContextError, LTIImproperlyConfigured,
                                  LTIValidationError)
-from lti_tool.models import Context, LTIResource, Platform, Resource
+from lti_tool.models import Context, Platform, Resource, ResourceLink
 
 
 def validate(request):
     platform = Platform.objects.get(pk=request.session['lti-platform'])
 
     if request.method.lower() != 'post' or 'id_token' not in request.POST:
-        return None
+        return None, None
 
     token = request.POST['id_token']
     nonce = request.session['lti-nonce']
@@ -73,6 +73,15 @@ class LTIResourceMixin(SingleObjectMixin):
         if not fields:
             return None
 
+        resource_link = self.get_object()
+        if not isinstance(resource_link, ResourceLink):
+            cls = resource_link.__class__.__name__
+            raise LTIImproperlyConfigured(
+                f'{cls} is not an instance of ResourceLink.'
+                f'Define {cls} as {cls}(ResourceLink).'
+            )
+
+        fields['resource_link'] = resource_link
         fields['context'] = context
 
         resource, created = Resource.objects.get_or_create(
@@ -83,18 +92,6 @@ class LTIResourceMixin(SingleObjectMixin):
 
         if not created:
             resource.update(fields)
-
-        opaque = self.get_object()
-        if not isinstance(opaque, LTIResource):
-            cls = opaque.__class__.__name__
-            raise LTIImproperlyConfigured(
-                f'{cls} is not an instance of LTIResource.'
-                f'Define {cls} as {cls}(LTIResource).'
-            )
-
-        if opaque.lti_resource != resource:
-            opaque.lti_resource = resource
-            opaque.save()
 
         return resource
 
@@ -119,16 +116,21 @@ class LTIResourceMixin(SingleObjectMixin):
             )
             if user is not None:
                 login(request, user)
-                request.session['lti-context'] = context.id
-        else:
-            claims = None
-            resource = None
-            context = None
 
-            # Get context from session
+                if context:
+                    request.session['lti-context'] = context.id
+                if resource:
+                    request.session['lti-resource'] = resource.id
+        else:
+            context = None
             context_pk = request.session.get('lti-context')
             if context_pk:
                 context = Context.objects.get(pk=context_pk)
+
+            resource = None
+            resource_pk = request.session.get('lti-resource')
+            if resource_pk:
+                resource = Resource.objects.get(pk=resource_pk)
 
         kwargs.update({
             'claims': claims,

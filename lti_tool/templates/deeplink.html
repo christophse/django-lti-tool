@@ -1,0 +1,27 @@
+<!doctype html>
+<html class="no-js" lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Deeplink</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+  <h2>Choose Resource:</h2>
+  <form action="{% url 'deeplink_redirect' %}" method="post">
+    {% csrf_token %}
+    {% for resource in resources %}
+    <input type="radio" name="resource" id="resource{{ forloop.counter }}" value="{{ resource.desc }}">
+    <label for="resource{{ forloop.counter }}">{{ resource.obj.title }}</label>
+    <br>
+    {% endfor %}
+    <input type="hidden" name="redirect_url" value="{{ redirect_url }}">
+    {% if data %}
+    <input type="hidden" name="data" value="{{ data }}">
+    {% endif %}
+    <input type="submit" value="Submit">
+  </form>
+</body>
+
+</html>

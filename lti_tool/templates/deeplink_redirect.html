@@ -1,0 +1,7 @@
+<!doctype html>
+<form id="autosubmit" action="{{ redirect_url }}" method="post">
+  <input type="hidden" name="JWT" value="{{ jwt }}">
+</form>
+<script type="text/javascript">
+document.getElementById('autosubmit').submit();
+</script>

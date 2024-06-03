@@ -2,14 +2,18 @@ from jwcrypto import jwk
 from secrets import token_hex
 from urllib.parse import urlencode
 
+from django.apps import apps
 from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
+from django.views.generic.base import TemplateView
 
-from lti_tool.models import Key, Platform
+from lti_tool.jwt import form_jwt
+from lti_tool.models import Key, Platform, ResourceLink
+from lti_tool.mixins import LTIMessageMixin
 
 
 class KeysView(View):
@@ -31,9 +35,9 @@ class KeysView(View):
 class LoginView(View):
     def post(self, request, *args, **kwargs):
         platform = get_object_or_404(
-                Platform,
-                issuer=request.POST['iss'],
-                deployment_id=request.POST['lti_deployment_id']
+            Platform,
+            issuer=request.POST['iss'],
+            deployment_id=request.POST['lti_deployment_id']
         )
 
         # client_id is optional in login POST
@@ -58,3 +62,69 @@ class LoginView(View):
 
         url = '{}?{}'.format(platform.auth_req_url, urlencode(params))
         return redirect(url)
+
+
+class DeeplinkView(LTIMessageMixin, TemplateView):
+    template_name = 'deeplink.html'
+
+    def post(self, request, claims, *args, **kwargs):
+        resources = []
+        for cls in ResourceLink.__subclasses__():
+            objects = cls.objects.all()
+            for obj in objects:
+                resources.append(
+                    {
+                        'desc': f'{obj._meta.app_label}.{obj._meta.model_name}#{obj.id}',
+                        'obj': obj,
+                    }
+                )
+        settings = claims['https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings']
+        redirect_url = settings['deep_link_return_url']
+        data = settings.get('data', None)
+
+        return super(DeeplinkView, self).render_to_response(
+            {
+                'redirect_url': redirect_url,
+                'data': data,
+                'resources': resources,
+            }
+        )
+
+
+class DeeplinkRedirectView(TemplateView):
+    template_name = 'deeplink_redirect.html'
+
+    def post(self, request):
+        platform = Platform.objects.get(pk=request.session['lti-platform'])
+
+        resource_desc = request.POST['resource'].split('#', maxsplit=1)
+        model_meta, obj_id = resource_desc[0], resource_desc[1]
+        model = apps.get_model(model_meta)
+
+        resource = model.objects.get(pk=obj_id)
+
+        content_item = {
+            'type': 'ltiResourceLink',
+            'title': resource.title,
+            'url': request.build_absolute_uri(resource.get_absolute_url())
+        }
+
+        resp_claims = {
+            'https://purl.imsglobal.org/spec/lti/claim/message_type': 'LtiDeepLinkingResponse',
+            'https://purl.imsglobal.org/spec/lti/claim/version': '1.3.0',
+            'https://purl.imsglobal.org/spec/lti/claim/deployment_id': platform.deployment_id,
+            'https://purl.imsglobal.org/spec/lti-dl/claim/content_items': [content_item],
+        }
+
+        data = request.POST.get('data', None)
+        if data:
+            resp_claims.update({
+                'https://purl.imsglobal.org/spec/lti-dl/claim/data': data
+            })
+
+        return super(DeeplinkRedirectView, self).render_to_response(
+            {
+                'redirect_url': request.POST['redirect_url'],
+                'jwt': form_jwt(platform, resp_claims)
+            }
+        )

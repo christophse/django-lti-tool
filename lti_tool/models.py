@@ -4,7 +4,8 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from lti_tool.ags import LineItem, LineItemManager
-from lti_tool.exceptions import LTIRequestError, LTIKeyRetrieveError
+from lti_tool.exceptions import (LTIKeyRetrieveError, LTINoLineItem,
+                                 LTIRequestError, LTIResourceError)
 from lti_tool.httpclient import HTTPClient
 
 
@@ -156,7 +157,12 @@ class Context(Updatable):
         }
 
 
+class ResourceLink(models.Model):
+    title = models.CharField(max_length=255, null=True)
+
+
 class Resource(Updatable):
+    resource_link = models.ForeignKey(ResourceLink, on_delete=models.CASCADE)
     resource_id = models.CharField(editable=False, max_length=255)
     platform = models.ForeignKey(Platform, editable=False,
                                  on_delete=models.CASCADE)
@@ -180,6 +186,11 @@ class Resource(Updatable):
 
         :rtype: :class:`ags.LineItem`
         """
+        if not self.lineitem_id:
+            raise LTINoLineItem('No line item available. Make sure assigment '
+                                'and grade service is enabled on platform '
+                                'for this resource.')
+
         data = {'id': self.lineitem_id}
         lineitem = LineItem(self.context.lineitems, data)
 
@@ -197,8 +208,9 @@ class Resource(Updatable):
             'https://purl.imsglobal.org/spec/lti/claim/message_type'
         ]
 
-        if not msg_type == 'LtiResourceLinkRequest':
-            return None
+        if (not (msg_type == 'LtiResourceLinkRequest'
+                 or msg_type == 'LtiSubmissionReviewRequest')):
+            raise LTIResourceError(f'Unkown message type {msg_type}')
 
         resource_link = claims[
             'https://purl.imsglobal.org/spec/lti/claim/resource_link'
@@ -215,11 +227,6 @@ class Resource(Updatable):
             'description': resource_link.get('description'),
             'lineitem_id': ags.get('lineitem')
         }
-
-
-class LTIResource(models.Model):
-    lti_resource = models.ForeignKey(Resource, on_delete=models.PROTECT,
-                                     blank=True, null=True)
 
 
 class LTIUser(Updatable):
@@ -246,8 +253,8 @@ class LTIUser(Updatable):
         ).get('email')
 
         return {
-            'first_name': claims['given_name'],
-            'last_name': claims['family_name'],
+            'first_name': claims.get('given_name'),
+            'last_name': claims.get('family_name'),
             'email': mail_ext if mail_ext else mail_oidc,
         }
 

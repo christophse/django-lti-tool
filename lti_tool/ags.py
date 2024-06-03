@@ -151,6 +151,18 @@ class LineItemManager:
 
         return resp
 
+    def get_user_result(self, lineitem_id, user):
+        """Gets result of a lineitem for a LTIUser.
+
+        :param lineitem_id: ID (url) of the lineitem
+        :param user: :class:`models.LTIUser`
+        :rtype: single entry of
+            'application/vnd.ims.lis.v2.resultcontainer+json' representation
+        """
+        results = self.get_results(lineitem_id)
+        id = user.identifier
+        return next((res for res in results if res['userId'] == id), None)
+
     def set_score(self, lineitem_id, score):
         """Sets score of a lineitem.
 
@@ -224,6 +236,15 @@ class LineItem:
             'application/vnd.ims.lis.v2.resultcontainer+json' representation
         """
         return self._manager.get_results(self.id)
+
+    def get_user_result(self, user):
+        """Gets result of this lineitem for a LTIUser.
+
+        :param user: :class:`models.LTIUser`
+        :rtype: single entry of
+            'application/vnd.ims.lis.v2.resultcontainer+json' representation
+        """
+        return self._manager.get_user_result(self.id, user)
 
     def set_score(self, score):
         """Sets score of this lineitem.
