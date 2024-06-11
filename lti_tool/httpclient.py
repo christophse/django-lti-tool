@@ -1,4 +1,3 @@
-from jwcrypto import jwt
 import requests
 
 from django.core.cache import cache

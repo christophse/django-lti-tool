@@ -24,6 +24,7 @@ class Updatable(models.Model):
                 setattr(self, key, value)
                 updated.append(key)
 
+        # Empty 'updated' iterable will skip save
         self.save(update_fields=updated)
 
 
@@ -147,8 +148,7 @@ class Context(Updatable):
             {}
         )
 
-        return {
-            'id': context['id'],  # Mandatory
+        return context['id'], {
             'label': context.get('label'),
             'title': context.get('title'),
             'context_type': context.get('type'),
@@ -221,8 +221,7 @@ class Resource(Updatable):
             {}
         )
 
-        return {
-            'id': resource_link['id'],
+        return resource_link['id'], {
             'title': resource_link.get('title'),
             'description': resource_link.get('description'),
             'lineitem_id': ags.get('lineitem')

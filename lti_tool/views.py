@@ -1,4 +1,5 @@
-from jwcrypto import jwk
+from jwcrypto import jwk, jwt
+from jwcrypto.common import json_decode, JWException
 from secrets import token_hex
 from urllib.parse import urlencode
 
@@ -6,14 +7,23 @@ from django.apps import apps
 from django.http import HttpResponse
 from django.middleware.csrf import get_token
 from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt, ensure_csrf_cookie
 from django.views.generic.base import TemplateView
 
+from lti_tool.exceptions import LTIValidationError
 from lti_tool.jwt import form_jwt
 from lti_tool.models import Key, Platform, ResourceLink
-from lti_tool.mixins import LTIMessageMixin
+
+
+def get_resource_objects():
+    resources = []
+    for cls in ResourceLink.__subclasses__():
+        objects = list(cls.objects.all())
+        resources.extend(objects)
+    return resources
 
 
 class KeysView(View):
@@ -33,6 +43,8 @@ class KeysView(View):
 @method_decorator(csrf_exempt, name='dispatch')
 @method_decorator(ensure_csrf_cookie, name='dispatch')
 class LoginView(View):
+    http_method_names = ['post']
+
     def post(self, request, *args, **kwargs):
         platform = get_object_or_404(
             Platform,
@@ -53,7 +65,7 @@ class LoginView(View):
             'response_mode': 'form_post',
             'prompt': 'none',
             'client_id': client_id,
-            'redirect_uri': request.POST['target_link_uri'],
+            'redirect_uri': request.build_absolute_uri(reverse('lti_redirect')),
             'state': get_token(request),
             'nonce': nonce,
             'login_hint': request.POST['login_hint'],
@@ -64,20 +76,78 @@ class LoginView(View):
         return redirect(url)
 
 
-class DeeplinkView(LTIMessageMixin, TemplateView):
+class RedirectView(View):
+    http_method_names = ['post']
+
+    def validate_message(self, request):
+        try:
+            token = request.POST['id_token']
+            nonce = request.session['lti-nonce']
+            platform_pk = request.session['lti-platform']
+        except (AttributeError, KeyError) as e:
+            raise LTIValidationError from e
+
+        platform = Platform.objects.get(pk=platform_pk)
+
+        check_claims = {
+            'aud': platform.client_id,
+            'iss': platform.issuer
+        }
+
+        try:
+            token_json = jwt.JWT(jwt=token, key=platform.keyset,
+                                 check_claims=check_claims)
+        except JWException as e:
+            raise LTIValidationError from e
+
+        claims = json_decode(token_json.claims)
+
+        if nonce != claims['nonce']:
+            raise LTIValidationError('Nonce is invalid.')
+
+        return claims
+
+    def validate_redirect(self, request, redirect_uri):
+        uris = []
+        for obj in get_resource_objects():
+            uris.append(
+                request.build_absolute_uri(obj.get_absolute_url())
+            )
+
+        uris.append(request.build_absolute_uri(reverse('lti_deeplink')))
+
+        if redirect_uri not in uris:
+            raise LTIValidationError(
+                f'target_link_uri {redirect_uri} is not a valid redirection uri.'
+            )
+
+    def post(self, request, *args, **kwargs):
+        claims = self.validate_message(request)
+        request.session['lti-claims'] = claims
+
+        redirect_uri = claims[
+            'https://purl.imsglobal.org/spec/lti/claim/target_link_uri'
+        ]
+        self.validate_redirect(request, redirect_uri)
+
+        return redirect(redirect_uri)
+
+
+class DeeplinkView(TemplateView):
     template_name = 'deeplink.html'
 
-    def post(self, request, claims, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        claims = request.session['lti-claims']
+
         resources = []
-        for cls in ResourceLink.__subclasses__():
-            objects = cls.objects.all()
-            for obj in objects:
-                resources.append(
-                    {
-                        'desc': f'{obj._meta.app_label}.{obj._meta.model_name}#{obj.id}',
-                        'obj': obj,
-                    }
-                )
+        for obj in get_resource_objects():
+            resources.append(
+                {
+                    'desc': f'{obj._meta.app_label}.{obj._meta.model_name}#{obj.id}',
+                    'obj': obj,
+                }
+            )
+
         settings = claims['https://purl.imsglobal.org/spec/lti-dl/claim/deep_linking_settings']
         redirect_url = settings['deep_link_return_url']
         data = settings.get('data', None)
@@ -92,6 +162,7 @@ class DeeplinkView(LTIMessageMixin, TemplateView):
 
 
 class DeeplinkRedirectView(TemplateView):
+    http_method_names = ['post']
     template_name = 'deeplink_redirect.html'
 
     def post(self, request):
