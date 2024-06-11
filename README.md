@@ -10,6 +10,7 @@ It is tightly integrated into Django and maps LTI entities (platforms, contexts,
 |LTI 1.3 (Core)|Yes|
 |Assignment and Grade Service|Yes|
 |Deep Linking|WIP|
+|Submission Review Service|No|
 |Names and Role Provisioning Services|No|
 
 ## Quick Setup
@@ -30,4 +31,4 @@ python manage.py makemigrations lti_tool && python manage.py migrate
 ```
 ## Credits
 
-Django-lti-tool is developed at [Open Distributed Systems Chair](https://www.ods.tu-berlin.de/).
+Django-lti-tool was initially developed at [Open Distributed Systems Chair](https://www.ods.tu-berlin.de/).
