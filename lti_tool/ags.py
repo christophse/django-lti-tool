@@ -1,7 +1,7 @@
 from datetime import datetime
-from pytz import utc
-
 from urllib.parse import urlsplit, urlunsplit
+
+from pytz import utc
 
 
 def ts2str(ts):
@@ -11,7 +11,7 @@ def ts2str(ts):
     :rtype: date-time (utc) string in ISO 8601 representation with
         millisecond precision
     """
-    return ts.astimezone(utc).isoformat(timespec='milliseconds')
+    return ts.astimezone(utc).isoformat(timespec="milliseconds")
 
 
 class LineItemManager:
@@ -21,13 +21,15 @@ class LineItemManager:
 
     def _build_url(self, url, affix):
         url_parts = urlsplit(url)
-        return urlunsplit((
-            url_parts.scheme,
-            url_parts.netloc,
-            f'{url_parts.path}{affix}',
-            url_parts.query,
-            url_parts.fragment
-        ))
+        return urlunsplit(
+            (
+                url_parts.scheme,
+                url_parts.netloc,
+                f"{url_parts.path}{affix}",
+                url_parts.query,
+                url_parts.fragment,
+            )
+        )
 
     def get(self, lineitem_id):
         """Gets a lineitem.
@@ -35,49 +37,45 @@ class LineItemManager:
         :param lineitem_id: ID (url) of the lineitem
         :rtype: :class:`ags.LineItem`
         """
-        headers = {
-            'Accept': 'application/vnd.ims.lis.v2.lineitem+json'
-        }
+        headers = {"Accept": "application/vnd.ims.lis.v2.lineitem+json"}
 
         resp = self._client.get(
-            lineitem_id,
-            context=self.context,
-            headers=headers
+            lineitem_id, context=self.context, headers=headers
         ).json()
 
         return LineItem(self, resp, loaded=True)
 
-    def create(self, label='', score_maximum=100, resource_link_id=None,
-               resource_id=None, tag=None, start_ts=None, end_ts=None):
+    def create(
+        self,
+        label="",
+        score_maximum=100,
+        resource_link_id=None,
+        resource_id=None,
+        tag=None,
+        start_ts=None,
+        end_ts=None,
+    ):
         """Creates a lineitem.
 
         :rtype: :class:`ags.LineItem`
         """
-        headers = {
-            'Content-Type': 'application/vnd.ims.lis.v2.lineitem+json'
-        }
+        headers = {"Content-Type": "application/vnd.ims.lis.v2.lineitem+json"}
 
-        data = {
-            'label': label,
-            'scoreMaximum': score_maximum
-        }
+        data = {"label": label, "scoreMaximum": score_maximum}
 
         if resource_link_id:
-            data['resourceLinkId'] = resource_link_id
+            data["resourceLinkId"] = resource_link_id
         if resource_id:
-            data['resourceId'] = resource_id
+            data["resourceId"] = resource_id
         if tag:
-            data['tag'] = tag
+            data["tag"] = tag
         if start_ts:
-            data['startDateTime'] = ts2str(start_ts)
+            data["startDateTime"] = ts2str(start_ts)
         if end_ts:
-            data['endDateTime'] = ts2str(end_ts)
+            data["endDateTime"] = ts2str(end_ts)
 
         resp = self._client.post(
-            self.context._lineitems,
-            context=self.context,
-            headers=headers,
-            json=data
+            self.context._lineitems, context=self.context, headers=headers, json=data
         ).json()
 
         return LineItem(self, resp, loaded=True)
@@ -87,10 +85,7 @@ class LineItemManager:
 
         :param lineitem_id: ID (url) of the lineitem
         """
-        self._client.delete(
-            lineitem_id,
-            context=self.context
-        )
+        self._client.delete(lineitem_id, context=self.context)
 
     def update(self, lineitem_id, data):
         """Updates a lineitem.
@@ -102,15 +97,10 @@ class LineItemManager:
             representation
         :rtype: :class:`ags.LineItem`
         """
-        headers = {
-            'Content-Type': 'application/vnd.ims.lis.v2.lineitem+json'
-        }
+        headers = {"Content-Type": "application/vnd.ims.lis.v2.lineitem+json"}
 
         resp = self._client.put(
-            lineitem_id,
-            context=self.context,
-            headers=headers,
-            json=data
+            lineitem_id, context=self.context, headers=headers, json=data
         ).json()
 
         return LineItem(self, resp, loaded=True)
@@ -120,14 +110,10 @@ class LineItemManager:
 
         :rtype: list of :class:`ags.LineItem`
         """
-        headers = {
-            'Accept': 'application/vnd.ims.lis.v2.lineitemcontainer+json'
-        }
+        headers = {"Accept": "application/vnd.ims.lis.v2.lineitemcontainer+json"}
 
         resp = self._client.get(
-            self.context._lineitems,
-            context=self.context,
-            headers=headers
+            self.context._lineitems, context=self.context, headers=headers
         ).json()
 
         return [LineItem(self, i, loaded=True) for i in resp]
@@ -139,14 +125,12 @@ class LineItemManager:
         :rtype: list of results in
             'application/vnd.ims.lis.v2.resultcontainer+json' representation
         """
-        headers = {
-            'Accept': 'application/vnd.ims.lis.v2.resultcontainer+json'
-        }
+        headers = {"Accept": "application/vnd.ims.lis.v2.resultcontainer+json"}
 
         resp = self._client.get(
-            self._build_url(lineitem_id, '/results'),
+            self._build_url(lineitem_id, "/results"),
             context=self.context,
-            headers=headers
+            headers=headers,
         ).json()
 
         return resp
@@ -161,7 +145,7 @@ class LineItemManager:
         """
         results = self.get_results(lineitem_id)
         id = user.identifier
-        return next((res for res in results if res['userId'] == id), None)
+        return next((res for res in results if res["userId"] == id), None)
 
     def set_score(self, lineitem_id, score):
         """Sets score of a lineitem.
@@ -169,15 +153,13 @@ class LineItemManager:
         :param lineitem_id: ID (url) of the lineitem
         :param score: :class:`ags.Score`
         """
-        headers = {
-            'Content-Type': 'application/vnd.ims.lis.v1.score+json'
-        }
+        headers = {"Content-Type": "application/vnd.ims.lis.v1.score+json"}
 
         self._client.post(
-            self._build_url(lineitem_id, '/scores'),
+            self._build_url(lineitem_id, "/scores"),
             context=self.context,
             headers=headers,
-            json=score.to_dict()
+            json=score.to_dict(),
         )
 
 
@@ -193,7 +175,7 @@ class LineItem:
         return str(self._data)
 
     def __setattr__(self, key, value):
-        if not key.startswith('_'):
+        if not key.startswith("_"):
             self._data[key] = value
         super().__setattr__(key, value)
 
@@ -255,9 +237,16 @@ class LineItem:
 
 
 class Score:
-    def __init__(self, user, score_given=None, score_maximum=100,
-                 timestamp=None, activity_progress='Completed',
-                 grading_progress='FullyGraded', comment=None):
+    def __init__(
+        self,
+        user,
+        score_given=None,
+        score_maximum=100,
+        timestamp=None,
+        activity_progress="Completed",
+        grading_progress="FullyGraded",
+        comment=None,
+    ):
         self.user = user
         self.score_given = score_given
         self.score_maximum = score_maximum
@@ -269,49 +258,53 @@ class Score:
             self.timestamp = ts2str(datetime.now())
 
         valid_activity_progress = [
-            'Initialized',
-            'Started',
-            'InProgress',
-            'Submitted',
-            'Completed'
+            "Initialized",
+            "Started",
+            "InProgress",
+            "Submitted",
+            "Completed",
         ]
 
         if activity_progress in valid_activity_progress:
             self.activity_progress = activity_progress
         else:
-            raise ValueError(f'Argument activity_progress has to be one of '
-                             f'{str(valid_activity_progress)}')
+            raise ValueError(
+                f"Argument activity_progress has to be one of "
+                f"{str(valid_activity_progress)}"
+            )
 
         valid_grading_progress = [
-            'NotReady',
-            'Failed',
-            'PendingManual',
-            'Pending',
-            'FullyGraded'
+            "NotReady",
+            "Failed",
+            "PendingManual",
+            "Pending",
+            "FullyGraded",
         ]
 
         if grading_progress in valid_grading_progress:
             self.grading_progress = grading_progress
         else:
-            raise ValueError(f'Argument grading_progress has to be one of '
-                             f'{str(valid_grading_progress)}')
+            raise ValueError(
+                f"Argument grading_progress has to be one of "
+                f"{str(valid_grading_progress)}"
+            )
 
     def __repr__(self):
         return str(self.to_dict())
 
     def to_dict(self):
         score = {
-            'userId': self.user.identifier,
-            'timestamp': self.timestamp,
-            'gradingProgress': self.grading_progress,
-            'activityProgress': self.activity_progress
+            "userId": self.user.identifier,
+            "timestamp": self.timestamp,
+            "gradingProgress": self.grading_progress,
+            "activityProgress": self.activity_progress,
         }
 
         if self.score_given is not None:
-            score['scoreGiven'] = self.score_given
-            score['scoreMaximum'] = self.score_maximum
+            score["scoreGiven"] = self.score_given
+            score["scoreMaximum"] = self.score_maximum
 
         if self.comment:
-            score['comment'] = self.comment
+            score["comment"] = self.comment
 
         return score

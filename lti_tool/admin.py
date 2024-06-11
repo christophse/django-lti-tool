@@ -6,13 +6,13 @@ from lti_tool.models import Key, Platform, Resource
 
 @admin.register(Platform)
 class PlatformAdmin(admin.ModelAdmin):
-    list_display = ('issuer', 'deployment_id', 'key')
+    list_display = ("issuer", "deployment_id", "key")
 
 
 @admin.register(Key)
 class KeyAdmin(admin.ModelAdmin):
     form = KeyForm
-    list_display = ('kid',)
+    list_display = ("kid",)
 
 
 class ResourceInline(admin.TabularInline):

@@ -6,7 +6,7 @@ class LTIMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        request_csrf_token = request.POST.get('state', '')
+        request_csrf_token = request.POST.get("state", "")
         if request_csrf_token:
             request.META[settings.CSRF_HEADER_NAME] = request_csrf_token
 
