@@ -41,7 +41,6 @@ class KeysView(View):
 
 
 @method_decorator(csrf_exempt, name="dispatch")
-@method_decorator(ensure_csrf_cookie, name="dispatch")
 class LoginView(View):
     http_method_names = ["post"]
 
@@ -76,6 +75,7 @@ class LoginView(View):
         return redirect(url)
 
 
+@method_decorator(csrf_exempt, name="dispatch")
 class RedirectView(View):
     http_method_names = ["post"]
 
